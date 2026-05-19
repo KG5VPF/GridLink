@@ -897,7 +897,19 @@ def build_trusted_gateway_rows():
         if is_trusted and not trusted_on_band and not beacon_on_current_band and not is_detected:
             continue
 
-        if beacon_on_current_band:
+        display_source = None
+
+        if beacon_on_current_band and js8_timestamp:
+            if js8_timestamp["timestamp"] > beacon["timestamp"]:
+                display_source = "JS8"
+            else:
+                display_source = "VAC"
+        elif beacon_on_current_band:
+            display_source = "VAC"
+        elif js8_timestamp:
+            display_source = "JS8"
+
+        if display_source == "VAC":
             delta = now - beacon["timestamp"]
             minutes = int(delta.total_seconds() // 60)
             hours = minutes // 60
@@ -906,39 +918,39 @@ def build_trusted_gateway_rows():
             snr = beacon.get("snr")
             band_display = beacon.get("band", current_gateway_band)
             last_heard_dt = beacon["timestamp"]
-        else:
-            if js8_timestamp:
-                js8_data = js8_timestamp
+            source = "VAC"
 
-                delta = now - js8_data["timestamp"]
-                minutes = int(delta.total_seconds() // 60)
-                hours = minutes // 60
-                minutes = minutes % 60
-                activity = f"{hours:02}:{minutes:02}"
+        elif display_source == "JS8":
+            js8_data = js8_timestamp
 
-                snr = js8_data.get("snr")
+            delta = now - js8_data["timestamp"]
+            minutes = int(delta.total_seconds() // 60)
+            hours = minutes // 60
+            minutes = minutes % 60
+            activity = f"{hours:02}:{minutes:02}"
 
-                try:
-                    freq = float(js8_data.get("frequency", 0))
-                    if 14.0 <= freq < 15.0:
-                        band_display = "20m"
-                    elif 7.0 <= freq < 8.0:
-                        band_display = "40m"
-                    else:
-                        band_display = "---"
-                except Exception:
+            snr = js8_data.get("snr")
+
+            try:
+                freq = float(js8_data.get("frequency", 0))
+                if 14.0 <= freq < 15.0:
+                    band_display = "20m"
+                elif 7.0 <= freq < 8.0:
+                    band_display = "40m"
+                else:
                     band_display = "---"
+            except Exception:
+                band_display = "---"
 
-                last_heard_dt = js8_data["timestamp"]
-            else:
-                activity = "Detected" if is_detected else "No Beacon"
-                snr = None
-                band_display = "?" if is_detected else (current_gateway_band if current_gateway_band else "?")
-                last_heard_dt = None
-            
-        source = "VAC" if beacon_on_current_band else (
-            "JS8" if js8_timestamp else "---"
-        )
+            last_heard_dt = js8_data["timestamp"]
+            source = "JS8"
+
+        else:
+            activity = "Detected" if is_detected else "No Beacon"
+            snr = None
+            band_display = "?" if is_detected else (current_gateway_band if current_gateway_band else "?")
+            last_heard_dt = None
+            source = "---"
 
         row = format_gateway_row(
             status=status,
@@ -1241,6 +1253,22 @@ def get_recent_js8_activity(hours=3):
                     "frequency": frequency,
                     "snr": snr_value
                 }
+
+            # Home-station JS8 activity detection:
+            # JS8Call DIRECTED.TXT records replies from other stations, not our own outbound HB/SNR?.
+            # If another station replies with "HOMECALL SNR +/-NN", treat the configured home
+            # callsign as active RF evidence too. This only applies to the local setup callsign.
+            home_call = (config.get("callsign", "") or "").strip().upper()
+            raw_upper = raw_message.strip().upper()
+
+            if home_call and re.search(r"\b" + re.escape(home_call) + r"\b\s+SNR\s+[+-]?\d+", raw_upper):
+                existing_home = recent.get(home_call)
+                if existing_home is None or timestamp > existing_home["timestamp"]:
+                    recent[home_call] = {
+                        "timestamp": timestamp,
+                        "frequency": frequency,
+                        "snr": snr_value
+                    }
 
         except Exception:
             continue
@@ -4749,7 +4777,6 @@ def build_coordinate_outputs(lat, lon, original_text="", radio_safe=False):
         original_value = dm_value
 
     return [
-        ("Original / Cleaned", original_value),
         ("Decimal Degrees", decimal_to_clean_decimal(lat, lon)),
         ("Degrees Decimal Minutes", dm_value),
         ("Degrees Minutes Seconds", dms_value),
@@ -7770,7 +7797,7 @@ def open_grid_coordinate_converter():
 
     examples = tk.Label(
         input_frame,
-        text="Examples: 34.1234 -88.5678   |   34 07.407 N 088 59.259 W   |   16S 323456 3776543   |   EM54",
+        text="Examples: 39.8283 -98.5795   |   39 49.698 N 098 34.770 W   |   14S 535990 4408728   |   EM09",
         bg=theme["bg"],
         fg=theme["fg"],
         wraplength=620,
@@ -7793,18 +7820,28 @@ def open_grid_coordinate_converter():
         fg=theme["fg"]
     ).pack(side="left", padx=(0, 6))
 
-    ttk.Radiobutton(
+    tk.Radiobutton(
         mode_frame,
         text="VarAC",
         variable=output_mode_var,
-        value="VarAC"
+        value="VarAC",
+        bg=theme["bg"],
+        fg=theme["fg"],
+        selectcolor=theme["bg"],
+        activebackground=theme["bg"],
+        activeforeground=theme["fg"]
     ).pack(side="left")
 
-    ttk.Radiobutton(
+    tk.Radiobutton(
         mode_frame,
         text="JS8Call",
         variable=output_mode_var,
-        value="JS8Call"
+        value="JS8Call",
+        bg=theme["bg"],
+        fg=theme["fg"],
+        selectcolor=theme["bg"],
+        activebackground=theme["bg"],
+        activeforeground=theme["fg"]
     ).pack(side="left", padx=(6, 0))
 
     results_frame = tk.LabelFrame(
@@ -7939,17 +7976,18 @@ def open_grid_coordinate_converter():
         )
         value_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
-        ttk.Button(
+        tk.Button(
             row,
             text="Copy",
-            command=lambda v=var, l=label: copy_to_clipboard(v.get(), l)
+            command=lambda v=var, l=label: copy_to_clipboard(v.get(), l),
+            bg=theme["button_bg"],
+            fg=theme["button_fg"]
         ).pack(side="right")
 
         result_vars[label] = var
 
     for row_label in [
         "Detected Format",
-        "Original / Cleaned",
         "Decimal Degrees",
         "Degrees Decimal Minutes",
         "Degrees Minutes Seconds",
@@ -8007,16 +8045,20 @@ def open_grid_coordinate_converter():
 
     output_mode_var.trace_add("write", lambda *args: convert_coordinates())
 
-    ttk.Button(
+    tk.Button(
         button_frame,
         text="Convert",
-        command=convert_coordinates
+        command=convert_coordinates,
+        bg=theme["button_bg"],
+        fg=theme["button_fg"]
     ).pack(side="left", padx=(0, 6))
 
-    ttk.Button(
+    tk.Button(
         button_frame,
         text="Clear",
-        command=clear_results
+        command=clear_results,
+        bg=theme["button_bg"],
+        fg=theme["button_fg"]
     ).pack(side="left")
 
     entry.bind("<Return>", lambda event: convert_coordinates())
