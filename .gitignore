@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+
+# Runtime state
+processed_js8_triggers.txt
+last_vmail_id.txt
+
+# Local configs
+config.json
+varalert_config.json
+
+# Backup files
+*.bak*
+*_backup.py
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+
+# Local operator scheduled nets
+/data/custom_nets.json
+
+# Local operator scheduled nets
+/data/custom_nets.json

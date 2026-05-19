@@ -1,0 +1,6 @@
+requests
+tkintermapview
+maidenhead
+Pillow
+utm
+mgrs
