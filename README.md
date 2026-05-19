@@ -6,6 +6,9 @@
 
 ---
 
+
+
+
 ## 🚀 Overview
 
 GridLink is a companion application for amateur radio operators using **VarAC** and **JS8Call**.
@@ -120,6 +123,39 @@ Return path:
 ```
 Telegram → Relay → Gateway → RF (manual send)
 ```
+
+## Gateway Dashboard Status Indicators
+
+The Gateway Dashboard displays the current RF and relay status of known GridLink gateway stations.
+
+Status indicators:
+
+- `[D]` = **Detected**
+  - The station is internet-connected and currently detected by the GridLink relay system.
+  - No recent RF activity has been seen within the activity window.
+
+- `[A]` = **Active**
+  - Recent RF activity has been detected within the last activity window, currently approximately 2 hours.
+  - Activity may come from:
+    - VarAC advanced beacons
+    - JS8Call heartbeat / SNR interaction activity
+
+- `[T]` = **Trusted Gateway**
+  - Operator-designated trusted gateway station.
+  - Trusted gateways are configured locally by the operator.
+  - The gateway is trusted, but not currently detected online and not currently active on RF.
+
+Examples:
+
+- `[T]   ` = Trusted gateway not currently detected or active
+- `[T][A]` = Trusted gateway with recent RF activity
+- `[T][D]` = Trusted gateway detected online but not recently active on RF
+- `   [A]` = Active non-trusted gateway
+- `   [D]` = Detected non-trusted gateway
+
+The `SRC` column identifies the activity source:
+- `VAC` = VarAC activity
+- `JS8` = JS8Call activity
 
 ---
 
