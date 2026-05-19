@@ -847,8 +847,8 @@ def format_gateway_row(status, callsign, source, band, snr, activity):
 def build_trusted_gateway_rows():
     gateway_entries = []
 
-    recent_beacons = get_recent_beacons(hours=3)
-    recent_js8 = get_recent_js8_activity(hours=3)
+    recent_beacons = get_recent_beacons(hours=2)
+    recent_js8 = get_recent_js8_activity(hours=2)
     active_calls = {c.strip().upper() for c in active_gateway_callsigns if c.strip()}
     now = datetime.datetime.now(datetime.UTC)
 
@@ -1711,41 +1711,51 @@ trigger_polling_enabled = False
 # CONFIG
 # -------------------------
 
+def build_default_config():
+    return {
+        "callsign": "",
+        "grid": "",
+        "group": "",
+        "traffic_log_path": "",
+        "varac_db_path": str(VARAC_DB_FILE),
+        "js8call_directed_path": str(JS8CALL_DIRECTED_FILE),
+        "relay_url": "https://relay.varalert.net",
+        "theme": "light",
+        "show_broadcast_feed": False,
+        "show_beacon_feed": False,
+        "trusted_gateways": [],
+        "telegram_contacts": [],
+        "varalert_feed_font_size": 14,
+        "broadcast_feed_font_size": 11,
+        "telegram_dashboard_font_size": 13,
+        "js8_activity_filter_hours": 24,
+        "show_setup_on_start": True,
+    }
+
+
 def load_config():
     try:
         if CONFIG_FILE.exists():
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
 
-            loaded.setdefault("callsign", "")
-            loaded.setdefault("grid", "")
-            loaded.setdefault("group", "")
-            loaded.setdefault("traffic_log_path", "")
-            loaded.setdefault("varac_db_path", str(VARAC_DB_FILE))
-            loaded.setdefault("js8call_directed_path", str(JS8CALL_DIRECTED_FILE))
-            loaded.setdefault("relay_url", "https://relay.varalert.net")
-            loaded.setdefault("theme", "light")
-            loaded.setdefault("show_broadcast_feed", False)
-            loaded.setdefault("show_beacon_feed", False)
-            loaded.setdefault("trusted_gateways", [])
-            loaded.setdefault("telegram_contacts", [])
+            if not isinstance(loaded, dict):
+                loaded = {}
 
-            # Phase 5B - per-feed font sizes
-            loaded.setdefault("varalert_feed_font_size", 14)
-            loaded.setdefault("broadcast_feed_font_size", 11)
-            loaded.setdefault("telegram_dashboard_font_size", 13)
-            loaded.setdefault("js8_activity_filter_hours", 24)
+            defaults = build_default_config()
+            for key, value in defaults.items():
+                loaded.setdefault(key, value)
 
-            # 🔥 NEW: mark first-run setup, but still return config
             if not loaded.get("callsign", "").strip() or not loaded.get("grid", "").strip():
                 loaded["show_setup_on_start"] = True
 
             return loaded
 
-        return setup_config()
+        return build_default_config()
+
     except Exception as e:
         print(f"Config load error: {e}")
-        return setup_config()
+        return build_default_config()
 
 
 def save_config():
@@ -9162,7 +9172,7 @@ def open_gateway_window():
         padx=8,
         pady=8
     )
-    list_frame.pack(fill="both", expand=True)
+    list_frame.pack(fill="both", expand=False)
 
     tk.Label(
         list_frame,
@@ -9193,6 +9203,7 @@ def open_gateway_window():
         selectforeground=theme["list_select_fg"],
         yscrollcommand=gateway_scroll.set,
         font=("Courier", 14),
+        height=8,
     )
 
     gateway_scroll.config(command=gateway_list.yview)
@@ -9356,7 +9367,7 @@ def open_gateway_window():
     ).pack(side="right")
 
     apply_theme_to_toplevel(win)
-    configure_toplevel_window(win, 600, 420, min_width=520, min_height=360)
+    configure_toplevel_window(win, 600, 360, min_width=520, min_height=320)
 
 
 def normalize_js8_alias(alias_text):
@@ -9881,7 +9892,7 @@ def open_js8_compose_window():
     # BUTTONS
     # -------------------------
     btn_frame = tk.Frame(outer, bg=theme["bg"])
-    btn_frame.pack(fill="x")
+    btn_frame.pack(fill="x", pady=(10, 0))
 
     tk.Button(
         btn_frame,
@@ -10334,9 +10345,10 @@ def open_js8_reply_window():
         fg=theme["list_fg"],
         selectbackground=theme["list_select_bg"],
         selectforeground=theme["list_select_fg"],
-        font=("Courier", 12)
+        font=("Courier", 12),
+        height=4
     )
-    reply_list.pack(fill="both", expand=True)
+    reply_list.pack(fill="x", expand=False)
 
     for r in js8_replies:
         alias = r.get("telegram_alias", "Unknown")
@@ -10490,7 +10502,7 @@ def open_js8_reply_window():
     ).pack(side="right")
 
     apply_theme_to_toplevel(win)
-    configure_toplevel_window(win, 600, 420, min_width=500, min_height=350)
+    configure_toplevel_window(win, 700, 360, min_width=560, min_height=320)
 
 
 def open_relay_settings_window():
